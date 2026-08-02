@@ -1,0 +1,96 @@
+启动指令
+cd "/Volumes/资料盘-3T/谷梓阳的作品/2026/面具-悬挂" && gradle run
+
+
+新版逻辑
+只有头盔摄像头。
+程序启动后默认 ESP32 控制 DISABLED，只检测、显示人框、显示当前命令，不向 ESP32 输出上下移动命令。
+按空格切换 ESP32 控制 ENABLED / DISABLED。切到 DISABLED 时会先发送 STOP。
+检测到人 = 当前命令 DOWN，让电葫芦收缩（当前现场开关接反，软件已反向）；只有 ESP32 ENABLED 时才真的输出。
+检测不到人 = 当前命令 STOP，停止收缩；只有 ESP32 ENABLED 时才持续输出。
+头盔摄像头拍到的内容可按需保存到 captures/helmet/<时间戳>/，默认关闭以减少卡顿。
+Helmet View 默认最大化，按窗口高度自适应画面宽度，保持摄像头原始比例，不拉伸。
+Helmet View 当前按 1280x960 / 4:3 使用，默认窗口也是 1280x960。
+UI 叠字中，非中央信息使用 Swing 三栏自适应排版，等待文字默认 Helvetica Neue；中央 STOP/CONTRACT 大字保留在视频中心。
+Helmet View 同一画面显示算法文字叠加层；主摄像头画面一直保留。无人时隐藏算法细节，保留顶部三栏每秒刷新状态信息和中央 STOP；检测到人时显示绿框。检测默认按 45 度步长扫描 8 个方向，摄像头斜着、横着、倒着都能触发。三栏信息区为每个检测框显示裁剪人像照片和对应算法细节。算法块和顶部状态使用同一套三栏布局，按窗口大小自适应。按 D 显示/隐藏。
+自动识别发送 HOIST_CONTRACT_COMMAND，当前默认是 DOWN；只有按住 ↓ 的手动模式会发送 HOIST_DESCEND_COMMAND，当前默认是 UP。ESP32 DISABLED 时这些命令只显示，不写串口。
+手动模式已加软件互锁：↑ 和 ↓ 同时按下时强制 STOP，不会输出 UP 或 DOWN；三个命令文本必须互不相同，避免配置绕开互锁。
+不做电子高度闭环。
+不做电子限位停止，依赖机器物理停止/限位。
+
+
+常用环境变量
+HELMET_CAMERA_URL="http://192.168.1.98:8080/stream"
+HELMET_CAMERA_URL="0"  # 本机摄像头测试
+AUTO_OPEN_CAMERA_PAGE="false"
+CAMERA_PAGE_URL="http://192.168.1.98:8080/"
+OPEN_CAMERA_PAGE_ON_RECONNECT="false"
+CONTROLLER_PORT_MATCH="usb,arduino,esp32,cp210,ch340,wchusbserial,usbserial"
+CONTROLLER_BAUD_RATE="115200"
+CONTROLLER_BOOT_WAIT_MS="2000"
+ESP32_ENABLED_ON_START="false"
+HOIST_CONTRACT_COMMAND="DOWN"
+HOIST_DESCEND_COMMAND="UP"
+HOIST_STOP_COMMAND="STOP"
+CAPTURE_ENABLED="false"
+CAPTURE_DIR="captures/helmet"
+CAPTURE_INTERVAL_MS="200"  # 约 5 fps；设为 0 尽量每帧保存
+CAPTURE_MP4_ENABLED="true"
+CAPTURE_MP4_FILENAME="helmet.mp4"
+CAPTURE_MP4_FPS="30"
+CAPTURE_MP4_INTERVAL_MS="0"  # MP4 默认每个新鲜处理帧都写入；设为 100 约 10fps
+OPENCV_THREADS="2"
+DETECT_MAX_WIDTH="640"  # 1280x960 会缩到 640x480 检测，再映射回原画面
+DETECT_EVERY_N_FRAMES="1"
+PERSON_HOG_HIT_THRESHOLD="0.35"  # HOG 行人检测阈值；背景误判时调高
+PERSON_MIN_HOG_WEIGHT="0.35"  # HOG 候选框最低权重；背景误判时优先调高
+PERSON_HOG_FINAL_THRESHOLD="2.0"
+PERSON_FACE_FALLBACK_MIN_WEIGHT="0.8"
+PERSON_MIN_HEIGHT_RATIO="0.12"
+PERSON_MIN_AREA_RATIO="0.008"
+PERSON_MIN_ASPECT_RATIO="0.25"
+PERSON_MAX_ASPECT_RATIO="0.85"
+PERSON_SCAN_ALL_ROTATIONS="true"  # 多方向检测；算力不够时可设 false
+PERSON_ROTATION_STEP_DEGREES="45"  # 默认 8 方向；设 30 更密但更慢
+UI_MAX_FPS="20"  # Helmet View 丢弃过期帧，避免 Swing UI 排队卡顿
+CONTACT_START_FRAMES="2"  # 启动防抖：连续检测次数
+CONTACT_START_HOLD_MS="180"  # 启动防抖：持续毫秒数
+MANUAL_AUTO_RESUME_DELAY_MS="3000"  # 松开手动方向键后恢复自动控制的缓冲
+FACE_SCALE_FACTOR="1.1"
+FACE_MIN_NEIGHBORS="6"
+DEBUG_UI_ENABLED="true"
+UI_STATUS_FONT="Helvetica Neue"
+
+
+拍摄记录
+captures/helmet/<时间戳>/helmet.mp4 保存 MP4 视频
+captures/helmet/<时间戳>/frames/ 保存 jpg 画面
+captures/helmet/<时间戳>/metadata.csv 保存每帧对应的人数、触发状态和 ESP32 命令
+
+
+树莓派
+ssh ziyang@192.168.1.98
+视频流: http://192.168.1.98:8080/stream
+网页:   http://192.168.1.98:8080/
+单帧:   http://192.168.1.98:8080/snapshot
+服务:   mjpgcam.service
+守护:   mjpgcam-guard.timer 每 20 秒检查 snapshot，失败则重启 mjpgcam
+旧 RTSP 服务 rtspcam.service 当前停用，避免和网页流抢摄像头
+旧 adaptive-stream.service 已停用，脚本里仍是 192.168.1.XX 的旧配置
+当前稳定配置: uStreamer, 1280x960 MJPEG, 目标 30fps, --buffers 8 --workers 1, 摄像头端和客户端实测约 30fps
+当前正常画面比例: 1280x960 = 4:3
+硬件上报规格已记录在 README: MJPG 支持 1920x1080/1280x960/1280x720/1024x768/800x600/640x480/352x288/320x240/160x120/2592x1944/2048x1536；YUYV 支持 640x480/1280x720/2048x1536/1920x1080/1280x960/960x540/800x600/2592x1944
+原因记录: 旧 uStreamer 默认只申请 2 个 V4L2 缓冲；1080p 推流时缓冲太紧，会触发 UVC 采集错误和 USB 摄像头重连。增加缓冲后，1080p 正式服务连续拉流通过且无新 USB/UVC 内核错误
+测试记录: 2592x1944 可出图但 60 秒拉流中会 USB 断开；1920x1080 + 2 buffers 在 120 秒拉流中会 USB 断开；1920x1080 + 4 buffers 通过 180 秒连续拉流；1920x1080 + 8 buffers 通过 60 秒短测
+4:3 测试记录: 2048x1536 摄像头端可 30fps 捕获、60 秒 HTTP 不断，但客户端 fps 一度约 17 且 SSH 曾短暂超时，不建议表演使用；1280x960 60 秒 HTTP 稳定，摄像头端和客户端均约 30fps，推荐作为 4:3 稳定档
+排查记录: 2026-06-28 曾出现 USB 摄像头重连后只以 12M full-speed 枚举，导致只剩 160x120 YUYV 10fps；软件 unbind/bind 未恢复，重启树莓派后恢复 480M high-speed 和 1920x1080 MJPEG
+卡顿排查: 2026-06-28 Helmet View 卡顿时，树莓派 mjpgcam 日志出现 Mainloop select() error / USB disconnect / Failed to set UVC probe control -71，本地 Java 进程也一度约 260% CPU。已把检测缩小到 640 宽、OpenCV 限 2 线程、UI 刷新限 20fps 并丢弃过期帧。如果仍卡，先查 /state 和 dmesg；USB 仍断就需要降推流 fps 或处理供电/线材。
+
+
+按键
+F 开关头盔画面上下翻转
+D 显示/隐藏 Helmet View 上的算法文字叠加层
+空格 启用/禁用 ESP32 控制；禁用时只检测和显示，不输出上下移动命令
+↑ 手动上升/收缩，当前命令 HOIST_CONTRACT_COMMAND，默认 DOWN
+↓ 手动下降/放松，当前命令 HOIST_DESCEND_COMMAND，默认 UP
+ESC 发送 STOP 并退出

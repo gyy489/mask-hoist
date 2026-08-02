@@ -1,0 +1,15 @@
+.DS_Store
+._*
+
+.gradle/
+.gradle-home/
+build/
+out/
+*.class
+
+captures/
+
+# Large local 3D/source assets exceed normal GitHub push limits.
+*.blend
+*.blend1
+物质/把自己吊起来/打印模型/脸.obj

@@ -1,0 +1,51 @@
+plugins {
+    id 'application'
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // System-installed OpenCV Java bindings (jar built with Java target=11).
+    def opencvJarPath = System.getenv("OPENCV_JAR") ?: "/opt/homebrew/opt/opencv-java/share/java/opencv4/opencv-4130.jar"
+    implementation files(opencvJarPath)
+    implementation "com.fazecast:jSerialComm:2.11.0"
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(23)
+    }
+}
+
+application {
+    mainClass = "HoistSystem"
+    def opencvLibPath = System.getenv("OPENCV_LIB_PATH") ?: "/opt/homebrew/opt/opencv-java/share/java/opencv4"
+    applicationDefaultJvmArgs = ["-Djava.library.path=${opencvLibPath}"]
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ["程序"]
+        }
+        resources {
+            // Bundle the cascade file on the runtime classpath.
+            srcDirs = ["程序"]
+            include "haarcascade_*.xml"
+            exclude "._*", "**/._*", ".DS_Store", "**/.DS_Store"
+        }
+    }
+}
+
+tasks.named("processResources") {
+    doLast {
+        layout.buildDirectory.dir("resources/main").get().asFile.eachFileRecurse { file ->
+            if (file.name.startsWith("._")) {
+                file.delete()
+            }
+        }
+    }
+}

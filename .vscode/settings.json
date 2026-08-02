@@ -1,0 +1,7 @@
+{
+    "java.project.referencedLibraries": [
+        "lib/**/*.jar",
+        "程序/libs/**/*.jar"
+    ],
+    "java.configuration.updateBuildConfiguration": "interactive"
+}
